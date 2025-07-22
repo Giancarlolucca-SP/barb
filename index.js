@@ -1,4 +1,3 @@
-// index.js
 const express = require('express');
 const cors = require('cors');
 const { createClient } = require('@supabase/supabase-js');
@@ -9,16 +8,16 @@ app.use(express.json());
 
 // 🔐 Substitua abaixo pelas suas chaves reais
 const supabaseUrl = 'https://gkpiaroqfrtuwtkdxgpo.supabase.co';
-const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdrcGlhcm9xZnJ0dXd0a2R4Z3BvIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc1MjMzMTE5NCwiZXhwIjoyMDY3OTA3MTk0fQ.1cjFGSNMDzRY6v0vpn2xkY9DlPPPlHuzzTgY4fF0OZo';
+const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...'; // service_role
 
 const supabase = createClient(supabaseUrl, supabaseKey);
 
-// Rota GET (teste)
+// Rota GET simples para teste
 app.get('/api/clients', async (req, res) => {
   res.json({ message: 'GET /api/clients funcionando!' });
 });
 
-// Rota POST (salvar cliente)
+// Rota POST para salvar cliente
 app.post('/api/clients', async (req, res) => {
   try {
     const { name, telefone, email, empresa } = req.body;
@@ -28,21 +27,17 @@ app.post('/api/clients', async (req, res) => {
       .insert([{ name, telefone, email, empresa }]);
 
     if (error) {
-      console.error('Erro ao salvar:', error.message);
-      return res.status(500).json({ status: 'Erro ao salvar cliente', erro: error.message });
+      console.error('Erro ao salvar cliente:', error.message);
+      return res.status(500).json({ status: 'Erro', erro: error.message });
     }
 
-    res.json({ status: 'Cliente salvo com sucesso no Supabase!', data_salva: data });
+    res.json({ status: 'Cliente salvo com sucesso!', data });
   } catch (err) {
-    console.error('Erro inesperado:', err.message);
+    console.error('Erro interno:', err.message);
     res.status(500).json({ status: 'Erro interno', erro: err.message });
   }
 });
 
-// Inicia o servidor acessível externamente
-app.listen(3000, '0.0.0.0', () => {
-  console.log('🚀 MCP rodando em http://192.168.15.16:3000');
-});
 // Rota POST para criar estabelecimento
 app.post('/api/establishments', async (req, res) => {
   try {
@@ -54,13 +49,62 @@ app.post('/api/establishments', async (req, res) => {
 
     if (error) {
       console.error('Erro ao criar estabelecimento:', error.message);
-      return res.status(500).json({ status: 'Erro ao criar estabelecimento', erro: error.message });
+      return res.status(500).json({ status: 'Erro', erro: error.message });
     }
 
-    res.json({ status: 'Estabelecimento criado com sucesso!', data_criada: data });
+    res.json({ status: 'Estabelecimento criado com sucesso!', data });
   } catch (err) {
-    console.error('Erro inesperado:', err.message);
+    console.error('Erro interno:', err.message);
     res.status(500).json({ status: 'Erro interno', erro: err.message });
   }
 });
 
+// Rota POST para cadastro (signup)
+app.post('/api/signup', async (req, res) => {
+  const { email, password } = req.body;
+
+  try {
+    const response = await fetch(`${supabaseUrl}/auth/v1/signup`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'apikey': supabaseKey
+      },
+      body: JSON.stringify({ email, password }),
+    });
+
+    const data = await response.json();
+    res.status(response.status).json(data);
+  } catch (error) {
+    console.error('Erro na rota /api/signup:', error);
+    res.status(500).json({ error: 'Erro interno no servidor MCP.' });
+  }
+});
+
+// Rota POST para login (signin)
+app.post('/api/signin', async (req, res) => {
+  const { email, password } = req.body;
+
+  try {
+    const response = await fetch(`${supabaseUrl}/auth/v1/token?grant_type=password`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'apikey': supabaseKey
+      },
+      body: JSON.stringify({ email, password }),
+    });
+
+    const data = await response.json();
+    res.status(response.status).json(data);
+  } catch (error) {
+    console.error('Erro na rota /api/signin:', error);
+    res.status(500).json({ error: 'Erro interno no servidor MCP.' });
+  }
+});
+
+// 🔁 Porta dinâmica para Railway ou 3000 local
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => {
+  console.log(`🚀 MCP rodando na porta ${PORT}`);
+});
