@@ -11,8 +11,7 @@ app.use(express.json());
 
 // Supabase config
 const supabaseUrl = 'https://gkpiaroqfrtuwtkdxgpo.supabase.co';
-const supabaseKey = 'const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdrcGlhcm9xZnJ0dXd0a2R4Z3BvIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc1MjMzMTE5NCwiZXhwIjoyMDY3OTA3MTk0fQ.DixWKoKTwvPHpF8aksu3PpZZGPLNy8yhq7tEe2nOIRc';
-'; // Substitua pela sua service_role
+const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdrcGlhcm9xZnJ0dXd0a2R4Z3BvIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc1MjMzMTE5NCwiZXhwIjoyMDY3OTA3MTk0fQ.DixWKoKTwvPHpF8aksu3PpZZGPLNy8yhq7tEe2nOIRc';
 const supabase = createClient(supabaseUrl, supabaseKey);
 
 // Rota GET de teste
@@ -99,18 +98,13 @@ app.post('/api/signin', async (req, res) => {
     res.status(500).json({ error: 'Erro interno na rota /signin' });
   }
 });
+
 // ✅ Rota de teste para manter Railway ativo
 app.get('/', (req, res) => {
   res.send('MCP Server is alive!');
 });
 
 // 🔥 Porta dinâmica para Railway
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
-  console.log(`🚀 MCP rodando na porta ${PORT}`);
-});
-
-// 🔥 Porta dinâmica para funcionar no Railway
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`🚀 MCP rodando na porta ${PORT}`);
