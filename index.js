@@ -99,6 +99,16 @@ app.post('/api/signin', async (req, res) => {
     res.status(500).json({ error: 'Erro interno na rota /signin' });
   }
 });
+// ✅ Rota de teste para manter Railway ativo
+app.get('/', (req, res) => {
+  res.send('MCP Server is alive!');
+});
+
+// 🔥 Porta dinâmica para Railway
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => {
+  console.log(`🚀 MCP rodando na porta ${PORT}`);
+});
 
 // 🔥 Porta dinâmica para funcionar no Railway
 const PORT = process.env.PORT || 3000;
