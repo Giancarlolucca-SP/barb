@@ -102,9 +102,9 @@ app.post('/api/signin', async (req, res) => {
     res.status(500).json({ error: 'Erro interno no servidor MCP.' });
   }
 });
-
-// 🔁 Porta dinâmica para Railway ou 3000 local
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`🚀 MCP rodando na porta ${PORT}`);
 });
+
+
