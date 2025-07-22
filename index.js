@@ -2,13 +2,17 @@ const express = require('express');
 const cors = require('cors');
 const { createClient } = require('@supabase/supabase-js');
 
+// ✅ Corrigido: importação dinâmica do fetch
+const fetch = (...args) => import('node-fetch').then(({ default: fetch }) => fetch(...args));
+
 const app = express();
 app.use(cors());
 app.use(express.json());
 
 // Supabase config
 const supabaseUrl = 'https://gkpiaroqfrtuwtkdxgpo.supabase.co';
-const supabaseKey = 'SUA_SERVICE_ROLE_KEY_AQUI'; // Substitua pela service_role
+const supabaseKey = 'const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdrcGlhcm9xZnJ0dXd0a2R4Z3BvIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc1MjMzMTE5NCwiZXhwIjoyMDY3OTA3MTk0fQ.DixWKoKTwvPHpF8aksu3PpZZGPLNy8yhq7tEe2nOIRc';
+'; // Substitua pela sua service_role
 const supabase = createClient(supabaseUrl, supabaseKey);
 
 // Rota GET de teste
