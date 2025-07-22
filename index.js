@@ -1,23 +1,22 @@
 const express = require('express');
 const cors = require('cors');
-const fetch = require('node-fetch');
 const { createClient } = require('@supabase/supabase-js');
 
 const app = express();
 app.use(cors());
 app.use(express.json());
 
-// 🔐 Supabase config
+// Supabase config
 const supabaseUrl = 'https://gkpiaroqfrtuwtkdxgpo.supabase.co';
-const supabaseKey = 'sua-service_role-key-aqui'; // substitua pela correta
+const supabaseKey = 'SUA_SERVICE_ROLE_KEY_AQUI'; // Substitua pela service_role
 const supabase = createClient(supabaseUrl, supabaseKey);
 
-// 🔍 Test route
-app.get('/api/clients', async (req, res) => {
+// Rota GET de teste
+app.get('/api/clients', (req, res) => {
   res.json({ message: 'GET /api/clients funcionando!' });
 });
 
-// 👤 Criar cliente
+// Rota para salvar cliente
 app.post('/api/clients', async (req, res) => {
   try {
     const { name, telefone, email, empresa } = req.body;
@@ -27,18 +26,16 @@ app.post('/api/clients', async (req, res) => {
       .insert([{ name, telefone, email, empresa }]);
 
     if (error) {
-      console.error('Erro ao salvar cliente:', error.message);
       return res.status(500).json({ status: 'Erro', erro: error.message });
     }
 
     res.json({ status: 'Cliente salvo com sucesso!', data });
   } catch (err) {
-    console.error('Erro interno:', err.message);
     res.status(500).json({ status: 'Erro interno', erro: err.message });
   }
 });
 
-// 🏢 Criar estabelecimento
+// Rota para criar estabelecimento
 app.post('/api/establishments', async (req, res) => {
   try {
     const { name, empresa, telefone, user_id } = req.body;
@@ -48,18 +45,16 @@ app.post('/api/establishments', async (req, res) => {
       .insert([{ name, empresa, telefone, user_id }]);
 
     if (error) {
-      console.error('Erro ao criar estabelecimento:', error.message);
       return res.status(500).json({ status: 'Erro', erro: error.message });
     }
 
     res.json({ status: 'Estabelecimento criado com sucesso!', data });
   } catch (err) {
-    console.error('Erro interno:', err.message);
     res.status(500).json({ status: 'Erro interno', erro: err.message });
   }
 });
 
-// 📝 Sign up
+// Rota de signup
 app.post('/api/signup', async (req, res) => {
   const { email, password } = req.body;
 
@@ -76,12 +71,11 @@ app.post('/api/signup', async (req, res) => {
     const data = await response.json();
     res.status(response.status).json(data);
   } catch (error) {
-    console.error('Erro na rota /api/signup:', error);
-    res.status(500).json({ error: 'Erro interno no servidor MCP.' });
+    res.status(500).json({ error: 'Erro interno na rota /signup' });
   }
 });
 
-// 🔑 Sign in
+// Rota de signin
 app.post('/api/signin', async (req, res) => {
   const { email, password } = req.body;
 
@@ -98,12 +92,11 @@ app.post('/api/signin', async (req, res) => {
     const data = await response.json();
     res.status(response.status).json(data);
   } catch (error) {
-    console.error('Erro na rota /api/signin:', error);
-    res.status(500).json({ error: 'Erro interno no servidor MCP.' });
+    res.status(500).json({ error: 'Erro interno na rota /signin' });
   }
 });
 
-// 🚀 Porta dinâmica para Railway
+// 🔥 Porta dinâmica para funcionar no Railway
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`🚀 MCP rodando na porta ${PORT}`);
