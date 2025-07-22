@@ -1,23 +1,23 @@
 const express = require('express');
 const cors = require('cors');
+const fetch = require('node-fetch');
 const { createClient } = require('@supabase/supabase-js');
 
 const app = express();
 app.use(cors());
 app.use(express.json());
 
-// 🔐 Substitua abaixo pelas suas chaves reais
+// 🔐 Supabase config
 const supabaseUrl = 'https://gkpiaroqfrtuwtkdxgpo.supabase.co';
-const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...'; // service_role
-
+const supabaseKey = 'sua-service_role-key-aqui'; // substitua pela correta
 const supabase = createClient(supabaseUrl, supabaseKey);
 
-// Rota GET simples para teste
+// 🔍 Test route
 app.get('/api/clients', async (req, res) => {
   res.json({ message: 'GET /api/clients funcionando!' });
 });
 
-// Rota POST para salvar cliente
+// 👤 Criar cliente
 app.post('/api/clients', async (req, res) => {
   try {
     const { name, telefone, email, empresa } = req.body;
@@ -38,7 +38,7 @@ app.post('/api/clients', async (req, res) => {
   }
 });
 
-// Rota POST para criar estabelecimento
+// 🏢 Criar estabelecimento
 app.post('/api/establishments', async (req, res) => {
   try {
     const { name, empresa, telefone, user_id } = req.body;
@@ -59,7 +59,7 @@ app.post('/api/establishments', async (req, res) => {
   }
 });
 
-// Rota POST para cadastro (signup)
+// 📝 Sign up
 app.post('/api/signup', async (req, res) => {
   const { email, password } = req.body;
 
@@ -81,7 +81,7 @@ app.post('/api/signup', async (req, res) => {
   }
 });
 
-// Rota POST para login (signin)
+// 🔑 Sign in
 app.post('/api/signin', async (req, res) => {
   const { email, password } = req.body;
 
@@ -102,9 +102,9 @@ app.post('/api/signin', async (req, res) => {
     res.status(500).json({ error: 'Erro interno no servidor MCP.' });
   }
 });
+
+// 🚀 Porta dinâmica para Railway
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`🚀 MCP rodando na porta ${PORT}`);
 });
-
-
