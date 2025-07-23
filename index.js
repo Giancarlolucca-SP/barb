@@ -1,88 +1,141 @@
 const express = require('express');
-const cors = require('cors');
-
 const app = express();
-app.use(cors());
-app.use(express.json());
 
-console.log('🚀 Iniciando servidor...');
+// Log de inicialização
+console.log('🚀 Starting server...');
+console.log('Environment:', process.env.NODE_ENV);
+console.log('Port from env:', process.env.PORT);
 
-// ✅ Rota de teste simples
+// Middleware
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ extended: true }));
+
+// CORS manual
+app.use((req, res, next) => {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, apikey');
+  
+  // Handle preflight
+  if (req.method === 'OPTIONS') {
+    res.status(200).end();
+    return;
+  }
+  
+  next();
+});
+
+// Log de todas as requisições
+app.use((req, res, next) => {
+  console.log(`${new Date().toISOString()} - ${req.method} ${req.path}`);
+  console.log('Headers:', req.headers);
+  console.log('Body:', req.body);
+  next();
+});
+
+// Rota raiz
 app.get('/', (req, res) => {
-  console.log('✅ Rota / foi acessada!');
+  console.log('Root route accessed');
   res.json({ 
-    message: 'MCP Server is alive!', 
+    status: 'OK',
+    message: 'MCP Server is running',
     timestamp: new Date().toISOString(),
-    status: 'running',
-    port: process.env.PORT || 3000
+    port: process.env.PORT,
+    method: 'GET',
+    path: '/'
   });
 });
 
-// Rota de teste adicional
+// Health check
 app.get('/health', (req, res) => {
-  console.log('✅ Health check acessado');
-  res.json({ status: 'healthy', timestamp: new Date().toISOString() });
+  console.log('Health check accessed');
+  res.json({ 
+    status: 'healthy',
+    uptime: process.uptime(),
+    timestamp: new Date().toISOString()
+  });
 });
 
-// Rota de signup simples para teste
-app.post('/api/signup', async (req, res) => {
+// Rota de signup
+app.post('/api/signup', (req, res) => {
+  console.log('=== SIGNUP REQUEST ===');
+  console.log('Method:', req.method);
+  console.log('Headers:', JSON.stringify(req.headers, null, 2));
+  console.log('Body:', JSON.stringify(req.body, null, 2));
+  console.log('Query:', req.query);
+  
   try {
-    console.log('🔐 Signup acessado com dados:', req.body);
     const { email, password } = req.body;
     
-    // Resposta de teste sem Supabase por enquanto
-    res.json({ 
-      message: 'Teste de signup funcionando!',
-      received: { email, password: '***' }
+    if (!email || !password) {
+      console.log('Missing email or password');
+      return res.status(400).json({
+        status: 'error',
+        message: 'Email and password are required'
+      });
+    }
+    
+    console.log('Signup successful for:', email);
+    res.json({
+      status: 'success',
+      message: 'Signup endpoint working perfectly!',
+      data: {
+        email: email,
+        receivedAt: new Date().toISOString()
+      }
     });
     
-  } catch (err) {
-    console.log('❌ Erro no signup:', err);
-    res.status(500).json({ error: 'Erro interno' });
+  } catch (error) {
+    console.error('Signup error:', error);
+    res.status(500).json({
+      status: 'error',
+      message: 'Internal server error',
+      error: error.message
+    });
   }
 });
 
-// Error handlers
-app.use((err, req, res, next) => {
-  console.error('❌ Erro não tratado:', err);
-  res.status(500).json({ error: 'Erro interno do servidor' });
+// Catch all 404
+app.use('*', (req, res) => {
+  console.log('404 - Route not found:', req.path);
+  res.status(404).json({
+    status: 'error',
+    message: 'Route not found',
+    path: req.path,
+    method: req.method
+  });
 });
 
-// 404 handler
-app.use((req, res) => {
-  console.log('❌ Rota não encontrada:', req.path);
-  res.status(404).json({ error: 'Rota não encontrada' });
+// Error handler
+app.use((error, req, res, next) => {
+  console.error('Unhandled error:', error);
+  res.status(500).json({
+    status: 'error',
+    message: 'Internal server error'
+  });
 });
 
-// Porta dinâmica para Railway
+// Start server
 const PORT = process.env.PORT || 3000;
+const HOST = '0.0.0.0';
 
-console.log('🔧 Tentando iniciar na porta:', PORT);
-
-const server = app.listen(PORT, '0.0.0.0', () => {
-  console.log(`✅ Servidor RODANDO com sucesso na porta ${PORT}`);
-  console.log(`🌍 URL: http://0.0.0.0:${PORT}`);
-  console.log(`📅 Iniciado em: ${new Date().toISOString()}`);
+const server = app.listen(PORT, HOST, () => {
+  console.log('✅ Server successfully started!');
+  console.log(`🌍 Server running on http://${HOST}:${PORT}`);
+  console.log(`📅 Started at: ${new Date().toISOString()}`);
 });
 
 server.on('error', (err) => {
-  console.error('❌ Erro ao iniciar servidor:', err);
-  process.exit(1);
+  console.error('❌ Server error:', err);
 });
 
 // Graceful shutdown
 process.on('SIGTERM', () => {
-  console.log('🛑 SIGTERM recebido, encerrando servidor...');
+  console.log('🛑 SIGTERM received');
   server.close(() => {
-    console.log('✅ Servidor encerrado');
+    console.log('✅ Server closed');
     process.exit(0);
   });
 });
 
-process.on('SIGINT', () => {
-  console.log('🛑 SIGINT recebido, encerrando servidor...');
-  server.close(() => {
-    console.log('✅ Servidor encerrado');
-    process.exit(0);
-  });
-});
+console.log('🎯 Server setup complete, waiting for requests...');
