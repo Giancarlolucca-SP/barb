@@ -26,7 +26,7 @@ app.use((req, res, next) => {
 
 // Supabase configuration
 const supabaseUrl = 'https://gkpiaroqfrtuwtkdxgpo.supabase.co';
-const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdrcGlhcm9xZnJ0dXd0a2R4Z3BvIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc1MjMzMTE5NCwiZXhwIjoyMDY3OTA3MTk0fQ.DixWKoKTwvPHpF8aksu3PpZZGPLNy8yhq7tEe2nOIRc';
+const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdrcGlhcm9xZnJ0dXd0a2R4Z3BvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTIzMzExOTQsImV4cCI6MjA2NzkwNzE5NH0.DixWKoKTwvPHpF8aksu3PpZZGPLNy8yhq7tEe2nOIRc';
 const supabase = createClient(supabaseUrl, supabaseKey);
 
 console.log('📡 Supabase connected:', supabaseUrl);
@@ -110,50 +110,59 @@ app.post('/api/signup', async (req, res) => {
   }
 });
 
-// Login route
-app.post('/api/signin', async (req, res) => {
+// Create establishment route
+app.post('/api/establishments', async (req, res) => {
   try {
-    console.log('🔑 Processing signin request...');
-    const { email, password } = req.body;
+    console.log('🏪 Processing establishment creation...');
+    const { name, empresa, telefone, user_id } = req.body;
 
-    if (!email || !password) {
+    // Validate input
+    if (!name || !empresa || !telefone || !user_id) {
+      console.log('❌ Missing required fields');
       return res.status(400).json({
         status: 'error',
-        message: 'Email and password are required'
+        message: 'All fields are required: name, empresa, telefone, user_id'
       });
     }
 
-    console.log(`🔍 Authenticating user: ${email}`);
+    console.log(`🏢 Creating establishment: ${name} for user: ${user_id}`);
 
-    const { data, error } = await supabase.auth.signInWithPassword({
-      email: email,
-      password: password,
-    });
+    // Insert establishment into Supabase
+    const { data, error } = await supabase
+      .from('establishments')
+      .insert([{
+        name: name,
+        empresa: empresa,
+        telefone: telefone,
+        user_id: user_id,
+        created_at: new Date().toISOString()
+      }])
+      .select();
 
     if (error) {
-      console.log('❌ Login failed:', error.message);
+      console.log('❌ Supabase error creating establishment:', error.message);
       return res.status(400).json({
         status: 'error',
-        message: error.message
+        message: error.message,
+        type: 'database_error'
       });
     }
 
-    console.log('✅ Login successful');
+    console.log('✅ Establishment created successfully');
+    console.log('🏪 Establishment data:', data[0]);
+
     res.status(200).json({
       status: 'success',
-      message: 'Login successful!',
-      data: {
-        user_id: data.user?.id,
-        email: data.user?.email,
-        access_token: data.session?.access_token
-      }
+      message: 'Establishment created successfully!',
+      data: data[0]
     });
 
   } catch (error) {
-    console.error('❌ Login error:', error);
+    console.error('❌ Unexpected error creating establishment:', error);
     res.status(500).json({
       status: 'error',
-      message: 'Internal server error'
+      message: 'Internal server error',
+      details: error.message
     });
   }
 });
