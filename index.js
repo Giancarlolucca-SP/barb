@@ -86,12 +86,12 @@ console.log(`Environment variables:`, {
   RAILWAY_ENVIRONMENT: process.env.RAILWAY_ENVIRONMENT
 });
 
-const server = app.listen(PORT, HOST, () => {
-  console.log(`✅ SUCCESS v3.0: Server is running on ${HOST}:${PORT}`);
+const server = app.listen(PORT, () => {
+  console.log(`✅ SUCCESS v3.0: Server is running on port ${PORT}`);
   console.log(`🌍 External URL: https://barb-production.up.railway.app`);
   console.log(`📊 Process ID: ${process.pid}`);
   console.log(`🕐 Started at: ${new Date().toISOString()}`);
-  console.log(`🔧 Server listening on all interfaces: ${HOST}`);
+  console.log(`🔧 Server listening on Railway`);
 });
 
 server.on('error', (err) => {
