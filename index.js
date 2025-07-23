@@ -50,3 +50,62 @@ app.post('/api/signup', (req, res) => {
   const { email, password } = req.body;
   
   res.status(200).json({
+    status: 'success',
+    message: 'Signup endpoint working perfectly!',
+    data: { email, timestamp: new Date().toISOString() }
+  });
+});
+
+// 404 handler
+app.use('*', (req, res) => {
+  console.log(`404: ${req.method} ${req.originalUrl}`);
+  res.status(404).json({
+    status: 'error',
+    message: 'Endpoint not found',
+    path: req.originalUrl
+  });
+});
+
+// Error handler
+app.use((err, req, res, next) => {
+  console.error('Error:', err);
+  res.status(500).json({
+    status: 'error',
+    message: 'Internal server error'
+  });
+});
+
+// Server configuration - CRITICAL FOR RAILWAY
+const PORT = parseInt(process.env.PORT) || 3000;
+const HOST = '0.0.0.0';
+
+console.log(`Attempting to start server on ${HOST}:${PORT}`);
+console.log(`Environment variables:`, {
+  PORT: process.env.PORT,
+  NODE_ENV: process.env.NODE_ENV,
+  RAILWAY_ENVIRONMENT: process.env.RAILWAY_ENVIRONMENT
+});
+
+const server = app.listen(PORT, HOST, () => {
+  console.log(`✅ SUCCESS v3.0: Server is running on ${HOST}:${PORT}`);
+  console.log(`🌍 External URL: https://barb-production.up.railway.app`);
+  console.log(`📊 Process ID: ${process.pid}`);
+  console.log(`🕐 Started at: ${new Date().toISOString()}`);
+  console.log(`🔧 Server listening on all interfaces: ${HOST}`);
+});
+
+server.on('error', (err) => {
+  console.error('❌ Server failed to start:', err);
+  process.exit(1);
+});
+
+// Graceful shutdown
+process.on('SIGTERM', () => {
+  console.log('🛑 SIGTERM received, shutting down gracefully');
+  server.close(() => {
+    console.log('✅ Server closed');
+    process.exit(0);
+  });
+});
+
+console.log('🎯 Server v3.0 setup complete, ready for connections...');
