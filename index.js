@@ -220,3 +220,23 @@ server.on('error', (err) => {
 });
 
 console.log('🎯 Server v4.0 setup complete - ready to save users to Supabase!');
+
+
+// Test route para debug Supabase
+app.get('/test-supabase', async (req, res) => {
+  try {
+    console.log('🧪 Testing Supabase connection...');
+    console.log('🔑 Using key:', supabaseKey.substring(0, 50) + '...');
+    
+    const { data, error } = await supabase.auth.getSession();
+    
+    res.json({
+      status: 'test',
+      key_preview: supabaseKey.substring(0, 50) + '...',
+      supabase_url: supabaseUrl,
+      error: error?.message || 'none'
+    });
+  } catch (err) {
+    res.json({ error: err.message });
+  }
+});
