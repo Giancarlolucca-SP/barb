@@ -70,6 +70,18 @@ app.get('/test-supabase', async (req, res) => {
   }
 });
 
+// Debug route - mostra configurações
+app.get('/debug', (req, res) => {
+  res.json({
+    url: supabaseUrl,
+    key_start: supabaseKey.substring(0, 50),
+    key_end: supabaseKey.substring(supabaseKey.length - 20),
+    key_length: supabaseKey.length,
+    has_anon: supabaseKey.includes('anon'),
+    has_service: supabaseKey.includes('service_role')
+  });
+});
+
 // Signup route - TESTE SIMPLES
 app.post('/api/signup', async (req, res) => {
   try {
