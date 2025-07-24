@@ -126,14 +126,14 @@ app.post('/api/signup', async (req, res) => {
 app.post('/api/establishments', async (req, res) => {
   try {
     console.log('🏪 Processing establishment creation...');
-    const { name, empresa, telefone, user_id } = req.body;
+    const { name, empresa, nome_responsavel, telefone, email, user_id } = req.body;
 
     // Validate input
-    if (!name || !empresa || !telefone || !user_id) {
+    if (!name || !empresa || !nome_responsavel || !telefone || !email || !user_id) {
       console.log('❌ Missing required fields');
       return res.status(400).json({
         status: 'error',
-        message: 'All fields are required: name, empresa, telefone, user_id'
+        message: 'All fields are required: name, empresa, nome_responsavel, telefone, email, user_id'
       });
     }
 
@@ -145,7 +145,9 @@ app.post('/api/establishments', async (req, res) => {
       .insert([{
         name: name,
         empresa: empresa,
+        nome_responsavel: nome_responsavel,
         telefone: telefone,
+        email: email,
         user_id: user_id,
         created_at: new Date().toISOString()
       }])
