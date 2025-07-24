@@ -51,24 +51,6 @@ app.get('/', (req, res) => {
     port: process.env.PORT
   });
 });
-// Test route para debug
-app.get('/test-supabase', async (req, res) => {
-  try {
-    console.log('🧪 Testing Supabase connection...');
-    console.log('🔑 Using key:', supabaseKey.substring(0, 50) + '...');
-    
-    const { data, error } = await supabase.auth.getSession();
-    
-    res.json({
-      status: 'test',
-      key_preview: supabaseKey.substring(0, 50) + '...',
-      supabase_url: supabaseUrl,
-      error: error?.message || 'none'
-    });
-  } catch (err) {
-    res.json({ error: err.message });
-  }
-});
 
 // Debug route - mostra configurações
 app.get('/debug', (req, res) => {
@@ -82,29 +64,22 @@ app.get('/debug', (req, res) => {
   });
 });
 
-// Signup route - TESTE SIMPLES
+// Signup route - SAVES TO SUPABASE
 app.post('/api/signup', async (req, res) => {
   try {
-    console.log('🔐 Testing simple signup...');
+    console.log('🔐 Processing signup request...');
     const { email, password } = req.body;
 
-    console.log('📧 Email:', email);
-    console.log('🔑 Key preview:', supabaseKey.substring(0, 30) + '...');
-    console.log('🌐 URL:', supabaseUrl);
+    // Validate input
+    if (!email || !password) {
+      console.log('❌ Missing email or password');
+      return res.status(400).json({
+        status: 'error',
+        message: 'Email and password are required'
+      });
+    }
 
-    // Teste simples sem auth
-    res.json({
-      status: 'test_success',
-      message: 'API functioning, but Supabase auth disabled for debug',
-      received: { email, password: '***' },
-      key_type: supabaseKey.includes('anon') ? 'anon' : 'other'
-    });
-
-  } catch (error) {
-    console.error('❌ Error:', error);
-    res.status(500).json({ error: error.message });
-  }
-});
+    console.log(`📧 Creating user for email: ${email}`);
 
     // Create user in Supabase Auth
     const { data: authData, error: authError } = await supabase.auth.signUp({
@@ -239,23 +214,3 @@ server.on('error', (err) => {
 });
 
 console.log('🎯 Server v4.0 setup complete - ready to save users to Supabase!');
-
-
-// Test route para debug Supabase
-app.get('/test-supabase', async (req, res) => {
-  try {
-    console.log('🧪 Testing Supabase connection...');
-    console.log('🔑 Using key:', supabaseKey.substring(0, 50) + '...');
-    
-    const { data, error } = await supabase.auth.getSession();
-    
-    res.json({
-      status: 'test',
-      key_preview: supabaseKey.substring(0, 50) + '...',
-      supabase_url: supabaseUrl,
-      error: error?.message || 'none'
-    });
-  } catch (err) {
-    res.json({ error: err.message });
-  }
-});
