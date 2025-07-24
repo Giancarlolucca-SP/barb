@@ -70,22 +70,29 @@ app.get('/test-supabase', async (req, res) => {
   }
 });
 
-// Signup route - SAVES TO SUPABASE
+// Signup route - TESTE SIMPLES
 app.post('/api/signup', async (req, res) => {
   try {
-    console.log('🔐 Processing signup request...');
+    console.log('🔐 Testing simple signup...');
     const { email, password } = req.body;
 
-    // Validate input
-    if (!email || !password) {
-      console.log('❌ Missing email or password');
-      return res.status(400).json({
-        status: 'error',
-        message: 'Email and password are required'
-      });
-    }
+    console.log('📧 Email:', email);
+    console.log('🔑 Key preview:', supabaseKey.substring(0, 30) + '...');
+    console.log('🌐 URL:', supabaseUrl);
 
-    console.log(`📧 Creating user for email: ${email}`);
+    // Teste simples sem auth
+    res.json({
+      status: 'test_success',
+      message: 'API functioning, but Supabase auth disabled for debug',
+      received: { email, password: '***' },
+      key_type: supabaseKey.includes('anon') ? 'anon' : 'other'
+    });
+
+  } catch (error) {
+    console.error('❌ Error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
 
     // Create user in Supabase Auth
     const { data: authData, error: authError } = await supabase.auth.signUp({
