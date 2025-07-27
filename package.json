@@ -1,7 +1,7 @@
 {
-  "name": "supabase-api-simple",
-  "version": "2.0.0",
-  "description": "API REST simples para Supabase + Establishment Management",
+  "name": "supabase-api-secure",
+  "version": "3.0.0",
+  "description": "API segura para Supabase com Auth + Establishment Management",
   "main": "index.js",
   "scripts": {
     "start": "node index.js",
