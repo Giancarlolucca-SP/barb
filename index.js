@@ -11,10 +11,57 @@ const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY;
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY;
 
+// Configurações N8N
+const N8N_WEBHOOK_URL = process.env.N8N_WEBHOOK_URL;
+const N8N_AUTH_TOKEN = process.env.N8N_AUTH_TOKEN;
+
 console.log('🌍 Configurações:');
 console.log('📡 Supabase URL:', SUPABASE_URL ? '✅ Configurado' : '❌ Não configurado');
 console.log('🔑 Anon Key:', SUPABASE_ANON_KEY ? '✅ Configurado' : '❌ Não configurado');
 console.log('🔒 Service Key:', SUPABASE_SERVICE_KEY ? '✅ Configurado' : '❌ Não configurado');
+console.log('🤖 N8N Webhook:', N8N_WEBHOOK_URL ? '✅ Configurado' : '❌ Não configurado');
+
+// =============================================
+// FUNÇÕES AUXILIARES N8N
+// =============================================
+
+async function sendToN8N(eventType, userData, additionalData = {}) {
+  try {
+    if (!N8N_WEBHOOK_URL) {
+      console.log('⚠️ N8N_WEBHOOK_URL não configurado');
+      return false;
+    }
+
+    const payload = {
+      event_type: eventType,
+      timestamp: new Date().toISOString(),
+      user_data: userData,
+      ...additionalData
+    };
+
+    console.log(`📡 Enviando evento ${eventType} para N8N...`);
+
+    const response = await fetch(N8N_WEBHOOK_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': N8N_AUTH_TOKEN ? `Bearer ${N8N_AUTH_TOKEN}` : undefined
+      },
+      body: JSON.stringify(payload)
+    });
+
+    if (response.ok) {
+      console.log(`✅ Evento ${eventType} enviado para N8N com sucesso!`);
+      return true;
+    } else {
+      console.error(`❌ Erro ao enviar ${eventType} para N8N:`, await response.text());
+      return false;
+    }
+  } catch (error) {
+    console.error(`💥 Erro no envio ${eventType} para N8N:`, error.message);
+    return false;
+  }
+}
 
 // =============================================
 // ENDPOINTS
@@ -26,11 +73,15 @@ app.get('/health', (req, res) => {
     status: 'ok',
     timestamp: new Date().toISOString(),
     service: 'supabase-api-secure',
-    version: '3.0.0',
+    version: '3.1.0',
     supabase: {
       url_configured: !!SUPABASE_URL,
       anon_key_configured: !!SUPABASE_ANON_KEY,
       service_key_configured: !!SUPABASE_SERVICE_KEY
+    },
+    n8n: {
+      webhook_configured: !!N8N_WEBHOOK_URL,
+      auth_configured: !!N8N_AUTH_TOKEN
     }
   });
 });
@@ -84,12 +135,19 @@ app.post('/api/signup-establishment', async (req, res) => {
       });
     }
 
-    // 2. Validar formato do email
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(email)) {
+    // 2. Validar formato do email (REGEX MAIS PERMISSIVO)
+    const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+    const emailToTest = email.toLowerCase().trim();
+    
+    console.log('🔍 Validando email:', emailToTest);
+    console.log('🔍 Regex test result:', emailRegex.test(emailToTest));
+    
+    if (!emailRegex.test(emailToTest)) {
+      console.log('❌ Email rejeitado pelo regex:', emailToTest);
       return res.status(400).json({
         status: 'error',
-        message: 'Formato de email inválido'
+        message: 'Formato de email inválido',
+        email_tested: emailToTest
       });
     }
 
@@ -112,14 +170,18 @@ app.post('/api/signup-establishment', async (req, res) => {
 
     // 5. Verificar se usuário já existe
     console.log('👤 Verificando se usuário já existe...');
-    const userCheckResponse = await fetch(`${SUPABASE_URL}/rest/v1/establishments?email=eq.${email.toLowerCase().trim()}`, {
+    console.log('🔍 Email para consulta:', emailToTest);
+    
+    const userCheckResponse = await fetch(`${SUPABASE_URL}/rest/v1/establishments?email=eq.${emailToTest}`, {
       headers: {
         'apikey': SUPABASE_ANON_KEY,
         'Authorization': `Bearer ${SUPABASE_SERVICE_KEY}`
       }
     });
 
+    console.log('✅ Resposta da consulta recebida');
     const existingUsers = await userCheckResponse.json();
+    console.log('📊 Usuários encontrados:', existingUsers.length);
     
     if (existingUsers.length > 0) {
       return res.status(400).json({
@@ -139,7 +201,7 @@ app.post('/api/signup-establishment', async (req, res) => {
         'Authorization': `Bearer ${SUPABASE_ANON_KEY}`
       },
       body: JSON.stringify({
-        email: email.toLowerCase().trim(),
+        email: emailToTest,
         password: password
       })
     });
@@ -173,7 +235,7 @@ app.post('/api/signup-establishment', async (req, res) => {
       empresa: empresa.trim(),
       nome_responsavel: name.trim(),
       telefone: cleanPhone,
-      email: email.toLowerCase().trim(),
+      email: emailToTest,
       user_id: userId
     };
 
@@ -204,16 +266,47 @@ app.post('/api/signup-establishment', async (req, res) => {
       });
     }
 
-    // 8. Sucesso total!
+    // 8. Sucesso total! + Integração N8N
     console.log('✅ Usuário e estabelecimento criados com sucesso!');
-    
+
+    // Preparar dados para N8N
+    const userData = {
+      user_id: userId,
+      establishment_id: establishmentResult[0]?.id,
+      name: name.trim(),
+      empresa: empresa.trim(),
+      telefone: cleanPhone,
+      email: emailToTest,
+      created_at: new Date().toISOString(),
+      lead_source: 'website_signup',
+      lead_score: 10
+    };
+
+    // Enviar para N8N (não bloqueia se der erro)
+    try {
+      const n8nSent = await sendToN8N('user_signup', userData, {
+        actions: ['send_welcome', 'start_sales_flow', 'create_lead'],
+        sales_priority: 'high',
+        follow_up_schedule: {
+          welcome: 'immediate',
+          follow_up_1: '2_hours',
+          follow_up_2: '24_hours',
+          follow_up_3: '7_days'
+        }
+      });
+      console.log('📡 N8N enviado:', n8nSent);
+    } catch (error) {
+      console.error('💥 Erro N8N (não crítico):', error.message);
+    }
+
+    // 9. Retornar sucesso
     const result = {
       status: 'success',
       message: 'Usuário e estabelecimento criados com sucesso!',
       data: {
         user_id: userId,
         establishment_id: establishmentResult[0]?.id,
-        email: email.toLowerCase().trim(),
+        email: emailToTest,
         establishment_name: empresa.trim(),
         responsible_name: name.trim(),
         phone: cleanPhone,
@@ -261,7 +354,7 @@ app.post('/api/validate-establishment', (req, res) => {
   if (!email) {
     errors.push('Email é obrigatório');
   } else {
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
     if (!emailRegex.test(email)) {
       errors.push('Formato de email inválido');
     }
@@ -323,118 +416,6 @@ app.post('/api/check-user', async (req, res) => {
   }
 });
 
-// Middleware de erro global
-app.use((error, req, res, next) => {
-  console.error('💥 Erro global:', error);
-  
-  res.status(500).json({
-    status: 'error',
-    message: 'Erro interno do servidor',
-    timestamp: new Date().toISOString()
-  });
-});
-
-// Iniciar servidor
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
-  console.log('🚀 API Supabase segura iniciada!');
-  console.log(`🌍 Porta: ${PORT}`);
-  console.log(`📍 Health: http://localhost:${PORT}/health`);
-  console.log(`📍 Test Supabase: http://localhost:${PORT}/test-supabase`);
-  console.log(`📍 Signup: http://localhost:${PORT}/api/signup-establishment`);
-  console.log(`📍 Validate: http://localhost:${PORT}/api/validate-establishment`);
-  console.log(`📍 Check User: http://localhost:${PORT}/api/check-user`);
-  console.log('🔐 Com Supabase Auth integrado!');
-  console.log('✨ API REST segura e funcional!');
-});
-
-
-// ADICIONAR ao seu código existente do Render
-
-// Configurações N8N
-const N8N_WEBHOOK_URL = process.env.N8N_WEBHOOK_URL;
-const N8N_AUTH_TOKEN = process.env.N8N_AUTH_TOKEN;
-
-// =============================================
-// FUNÇÕES AUXILIARES N8N
-// =============================================
-
-async function sendToN8N(eventType, userData, additionalData = {}) {
-  try {
-    if (!N8N_WEBHOOK_URL) {
-      console.log('⚠️ N8N_WEBHOOK_URL não configurado');
-      return false;
-    }
-
-    const payload = {
-      event_type: eventType,
-      timestamp: new Date().toISOString(),
-      user_data: userData,
-      ...additionalData
-    };
-
-    console.log(`📡 Enviando evento ${eventType} para N8N...`);
-
-    const response = await fetch(N8N_WEBHOOK_URL, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': N8N_AUTH_TOKEN ? `Bearer ${N8N_AUTH_TOKEN}` : undefined
-      },
-      body: JSON.stringify(payload)
-    });
-
-    if (response.ok) {
-      console.log(`✅ Evento ${eventType} enviado para N8N com sucesso!`);
-      return true;
-    } else {
-      console.error(`❌ Erro ao enviar ${eventType} para N8N:`, await response.text());
-      return false;
-    }
-  } catch (error) {
-    console.error(`💥 Erro no envio ${eventType} para N8N:`, error.message);
-    return false;
-  }
-}
-
-// =============================================
-// MODIFICAR O ENDPOINT SIGNUP EXISTENTE
-// =============================================
-
-// No final do endpoint /api/signup-establishment, APÓS o sucesso do cadastro:
-
-// 8. Sucesso total! + Sincronização completa
-console.log('✅ Usuário e estabelecimento criados com sucesso!');
-
-// NOVO: Enviar para N8N (Sistema de Vendas)
-const userData = {
-  user_id: userId,
-  establishment_id: establishmentResult[0]?.id,
-  name: name.trim(),
-  empresa: empresa.trim(),
-  telefone: cleanPhone,
-  email: email.toLowerCase().trim(),
-  created_at: new Date().toISOString(),
-  lead_source: 'website_signup',
-  lead_score: 10 // Score inicial
-};
-
-// Disparar eventos N8N
-const n8nSent = await sendToN8N('user_signup', userData, {
-  actions: ['send_welcome', 'start_sales_flow', 'create_lead'],
-  sales_priority: 'high',
-  follow_up_schedule: {
-    welcome: 'immediate',
-    follow_up_1: '2_hours',
-    follow_up_2: '24_hours',
-    follow_up_3: '7_days'
-  }
-});
-
-// =============================================
-// NOVOS ENDPOINTS PARA SINCRONIZAÇÃO
-// =============================================
-
 // Endpoint para receber respostas do WhatsApp
 app.post('/api/whatsapp-interaction', async (req, res) => {
   try {
@@ -453,33 +434,12 @@ app.post('/api/whatsapp-interaction', async (req, res) => {
         },
         body: JSON.stringify({
           lead_score: lead_score_update,
-          last_interaction: new Date().toISOString(),
-          interaction_count: 'establishments.interaction_count + 1'
+          last_interaction: new Date().toISOString()
         })
       });
       
       console.log('📊 Score atualizado:', lead_score_update);
     }
-    
-    // Registrar interação
-    const interactionData = {
-      user_id,
-      phone,
-      message,
-      interaction_type,
-      timestamp: new Date().toISOString(),
-      platform: 'whatsapp'
-    };
-    
-    await fetch(`${SUPABASE_URL}/rest/v1/interactions`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'apikey': SUPABASE_ANON_KEY,
-        'Authorization': `Bearer ${SUPABASE_SERVICE_KEY}`
-      },
-      body: JSON.stringify(interactionData)
-    });
     
     res.json({ status: 'success', message: 'Interação registrada' });
     
@@ -531,7 +491,7 @@ app.post('/api/trigger-sales-action', async (req, res) => {
 app.get('/api/sales-stats', async (req, res) => {
   try {
     // Buscar estatísticas do Supabase
-    const statsResponse = await fetch(`${SUPABASE_URL}/rest/v1/establishments?select=lead_score,interaction_count,created_at,last_interaction`, {
+    const statsResponse = await fetch(`${SUPABASE_URL}/rest/v1/establishments?select=lead_score,last_interaction,created_at`, {
       headers: {
         'apikey': SUPABASE_ANON_KEY,
         'Authorization': `Bearer ${SUPABASE_SERVICE_KEY}`
@@ -542,15 +502,15 @@ app.get('/api/sales-stats', async (req, res) => {
     
     const stats = {
       total_leads: establishments.length,
-      high_score_leads: establishments.filter(e => e.lead_score >= 50).length,
+      high_score_leads: establishments.filter(e => (e.lead_score || 0) >= 50).length,
       recent_interactions: establishments.filter(e => {
         if (!e.last_interaction) return false;
         const lastInteraction = new Date(e.last_interaction);
         const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
         return lastInteraction > oneDayAgo;
       }).length,
-      conversion_rate: 0, // Calcular baseado em vendas efetivas
-      avg_lead_score: establishments.reduce((sum, e) => sum + (e.lead_score || 0), 0) / establishments.length
+      avg_lead_score: establishments.length > 0 ? 
+        establishments.reduce((sum, e) => sum + (e.lead_score || 0), 0) / establishments.length : 0
     };
     
     res.json({ status: 'success', stats });
@@ -561,31 +521,31 @@ app.get('/api/sales-stats', async (req, res) => {
   }
 });
 
-console.log('🤖 Sistema de Vendas IA integrado!');
-console.log('📱 WhatsApp automation ativado!');
-console.log('📊 Analytics de vendas configurado!');
-
-// SUBSTITUA a validação de email no seu código do Render
-
-// CÓDIGO ATUAL (com problema):
-// const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-
-// CÓDIGO NOVO (mais permissivo):
-const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
-
-// OU ainda mais simples:
-const emailRegex = /\S+@\S+\.\S+/;
-
-// ADICIONE também um log para debug:
-console.log('🔍 Validando email:', email);
-console.log('🔍 Email após trim:', email.toLowerCase().trim());
-console.log('🔍 Regex test result:', emailRegex.test(email.toLowerCase().trim()));
-
-if (!emailRegex.test(email.toLowerCase().trim())) {
-  console.log('❌ Email rejeitado pelo regex:', email.toLowerCase().trim());
-  return res.status(400).json({
+// Middleware de erro global
+app.use((error, req, res, next) => {
+  console.error('💥 Erro global:', error);
+  
+  res.status(500).json({
     status: 'error',
-    message: 'Formato de email inválido',
-    email_tested: email.toLowerCase().trim() // Para debug
+    message: 'Erro interno do servidor',
+    timestamp: new Date().toISOString()
   });
-}
+});
+
+// Iniciar servidor
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => {
+  console.log('🚀 API Supabase segura iniciada!');
+  console.log(`🌍 Porta: ${PORT}`);
+  console.log(`📍 Health: http://localhost:${PORT}/health`);
+  console.log(`📍 Test Supabase: http://localhost:${PORT}/test-supabase`);
+  console.log(`📍 Signup: http://localhost:${PORT}/api/signup-establishment`);
+  console.log(`📍 Validate: http://localhost:${PORT}/api/validate-establishment`);
+  console.log(`📍 Check User: http://localhost:${PORT}/api/check-user`);
+  console.log(`📍 WhatsApp: http://localhost:${PORT}/api/whatsapp-interaction`);
+  console.log(`📍 Sales Stats: http://localhost:${PORT}/api/sales-stats`);
+  console.log('🔐 Com Supabase Auth integrado!');
+  console.log('🤖 Sistema de Vendas IA integrado!');
+  console.log('📱 WhatsApp automation configurado!');
+  console.log('✨ API REST segura e funcional!');
+});
