@@ -347,3 +347,245 @@ app.listen(PORT, () => {
   console.log('🔐 Com Supabase Auth integrado!');
   console.log('✨ API REST segura e funcional!');
 });
+
+
+// ADICIONAR ao seu código existente do Render
+
+// Configurações N8N
+const N8N_WEBHOOK_URL = process.env.N8N_WEBHOOK_URL;
+const N8N_AUTH_TOKEN = process.env.N8N_AUTH_TOKEN;
+
+// =============================================
+// FUNÇÕES AUXILIARES N8N
+// =============================================
+
+async function sendToN8N(eventType, userData, additionalData = {}) {
+  try {
+    if (!N8N_WEBHOOK_URL) {
+      console.log('⚠️ N8N_WEBHOOK_URL não configurado');
+      return false;
+    }
+
+    const payload = {
+      event_type: eventType,
+      timestamp: new Date().toISOString(),
+      user_data: userData,
+      ...additionalData
+    };
+
+    console.log(`📡 Enviando evento ${eventType} para N8N...`);
+
+    const response = await fetch(N8N_WEBHOOK_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': N8N_AUTH_TOKEN ? `Bearer ${N8N_AUTH_TOKEN}` : undefined
+      },
+      body: JSON.stringify(payload)
+    });
+
+    if (response.ok) {
+      console.log(`✅ Evento ${eventType} enviado para N8N com sucesso!`);
+      return true;
+    } else {
+      console.error(`❌ Erro ao enviar ${eventType} para N8N:`, await response.text());
+      return false;
+    }
+  } catch (error) {
+    console.error(`💥 Erro no envio ${eventType} para N8N:`, error.message);
+    return false;
+  }
+}
+
+// =============================================
+// MODIFICAR O ENDPOINT SIGNUP EXISTENTE
+// =============================================
+
+// No final do endpoint /api/signup-establishment, APÓS o sucesso do cadastro:
+
+// 8. Sucesso total! + Sincronização completa
+console.log('✅ Usuário e estabelecimento criados com sucesso!');
+
+// NOVO: Enviar para N8N (Sistema de Vendas)
+const userData = {
+  user_id: userId,
+  establishment_id: establishmentResult[0]?.id,
+  name: name.trim(),
+  empresa: empresa.trim(),
+  telefone: cleanPhone,
+  email: email.toLowerCase().trim(),
+  created_at: new Date().toISOString(),
+  lead_source: 'website_signup',
+  lead_score: 10 // Score inicial
+};
+
+// Disparar eventos N8N
+const n8nSent = await sendToN8N('user_signup', userData, {
+  actions: ['send_welcome', 'start_sales_flow', 'create_lead'],
+  sales_priority: 'high',
+  follow_up_schedule: {
+    welcome: 'immediate',
+    follow_up_1: '2_hours',
+    follow_up_2: '24_hours',
+    follow_up_3: '7_days'
+  }
+});
+
+// =============================================
+// NOVOS ENDPOINTS PARA SINCRONIZAÇÃO
+// =============================================
+
+// Endpoint para receber respostas do WhatsApp
+app.post('/api/whatsapp-interaction', async (req, res) => {
+  try {
+    console.log('📱 Interação WhatsApp recebida:', req.body);
+    
+    const { user_id, phone, message, interaction_type, lead_score_update } = req.body;
+    
+    // Atualizar score no Supabase
+    if (user_id && lead_score_update) {
+      const updateResponse = await fetch(`${SUPABASE_URL}/rest/v1/establishments?user_id=eq.${user_id}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          'apikey': SUPABASE_ANON_KEY,
+          'Authorization': `Bearer ${SUPABASE_SERVICE_KEY}`
+        },
+        body: JSON.stringify({
+          lead_score: lead_score_update,
+          last_interaction: new Date().toISOString(),
+          interaction_count: 'establishments.interaction_count + 1'
+        })
+      });
+      
+      console.log('📊 Score atualizado:', lead_score_update);
+    }
+    
+    // Registrar interação
+    const interactionData = {
+      user_id,
+      phone,
+      message,
+      interaction_type,
+      timestamp: new Date().toISOString(),
+      platform: 'whatsapp'
+    };
+    
+    await fetch(`${SUPABASE_URL}/rest/v1/interactions`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'apikey': SUPABASE_ANON_KEY,
+        'Authorization': `Bearer ${SUPABASE_SERVICE_KEY}`
+      },
+      body: JSON.stringify(interactionData)
+    });
+    
+    res.json({ status: 'success', message: 'Interação registrada' });
+    
+  } catch (error) {
+    console.error('💥 Erro na interação WhatsApp:', error);
+    res.status(500).json({ status: 'error', message: error.message });
+  }
+});
+
+// Endpoint para triggers manuais N8N
+app.post('/api/trigger-sales-action', async (req, res) => {
+  try {
+    const { user_id, action_type, custom_message } = req.body;
+    
+    // Buscar dados do usuário
+    const userResponse = await fetch(`${SUPABASE_URL}/rest/v1/establishments?user_id=eq.${user_id}`, {
+      headers: {
+        'apikey': SUPABASE_ANON_KEY,
+        'Authorization': `Bearer ${SUPABASE_SERVICE_KEY}`
+      }
+    });
+    
+    const userData = await userResponse.json();
+    
+    if (userData.length === 0) {
+      return res.status(404).json({ status: 'error', message: 'Usuário não encontrado' });
+    }
+    
+    // Enviar para N8N
+    const sent = await sendToN8N('sales_trigger', userData[0], {
+      action_type,
+      custom_message,
+      triggered_by: 'manual'
+    });
+    
+    res.json({ 
+      status: 'success', 
+      n8n_sent: sent,
+      message: `Ação ${action_type} disparada`
+    });
+    
+  } catch (error) {
+    console.error('💥 Erro no trigger manual:', error);
+    res.status(500).json({ status: 'error', message: error.message });
+  }
+});
+
+// Endpoint para estatísticas de vendas
+app.get('/api/sales-stats', async (req, res) => {
+  try {
+    // Buscar estatísticas do Supabase
+    const statsResponse = await fetch(`${SUPABASE_URL}/rest/v1/establishments?select=lead_score,interaction_count,created_at,last_interaction`, {
+      headers: {
+        'apikey': SUPABASE_ANON_KEY,
+        'Authorization': `Bearer ${SUPABASE_SERVICE_KEY}`
+      }
+    });
+    
+    const establishments = await statsResponse.json();
+    
+    const stats = {
+      total_leads: establishments.length,
+      high_score_leads: establishments.filter(e => e.lead_score >= 50).length,
+      recent_interactions: establishments.filter(e => {
+        if (!e.last_interaction) return false;
+        const lastInteraction = new Date(e.last_interaction);
+        const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+        return lastInteraction > oneDayAgo;
+      }).length,
+      conversion_rate: 0, // Calcular baseado em vendas efetivas
+      avg_lead_score: establishments.reduce((sum, e) => sum + (e.lead_score || 0), 0) / establishments.length
+    };
+    
+    res.json({ status: 'success', stats });
+    
+  } catch (error) {
+    console.error('💥 Erro nas estatísticas:', error);
+    res.status(500).json({ status: 'error', message: error.message });
+  }
+});
+
+console.log('🤖 Sistema de Vendas IA integrado!');
+console.log('📱 WhatsApp automation ativado!');
+console.log('📊 Analytics de vendas configurado!');
+
+// SUBSTITUA a validação de email no seu código do Render
+
+// CÓDIGO ATUAL (com problema):
+// const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+// CÓDIGO NOVO (mais permissivo):
+const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+
+// OU ainda mais simples:
+const emailRegex = /\S+@\S+\.\S+/;
+
+// ADICIONE também um log para debug:
+console.log('🔍 Validando email:', email);
+console.log('🔍 Email após trim:', email.toLowerCase().trim());
+console.log('🔍 Regex test result:', emailRegex.test(email.toLowerCase().trim()));
+
+if (!emailRegex.test(email.toLowerCase().trim())) {
+  console.log('❌ Email rejeitado pelo regex:', email.toLowerCase().trim());
+  return res.status(400).json({
+    status: 'error',
+    message: 'Formato de email inválido',
+    email_tested: email.toLowerCase().trim() // Para debug
+  });
+}
