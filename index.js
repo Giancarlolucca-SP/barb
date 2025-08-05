@@ -214,5 +214,4 @@ server.on('error', (err) => {
   console.error('❌ Server failed:', err);
   process.exit(1);
 });
-
 console.log('🎯 Server v4.0 setup complete - ready to save users to Supabase!');
