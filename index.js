@@ -215,3 +215,5 @@ server.on('error', (err) => {
   process.exit(1);
 });
 console.log('🎯 Server v4.0 setup complete - ready to save users to Supabase!');
+
+console.log('🚀 API Supabase FORÇADA iniciada!');
