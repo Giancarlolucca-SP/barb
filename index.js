@@ -216,4 +216,219 @@ server.on('error', (err) => {
 });
 console.log('🎯 Server v4.0 setup complete - ready to save users to Supabase!');
 
+// ADICIONAR ao seu index.js existente no Render
+
+// =============================================
+// EVOLUTION API INTEGRATION
+// =============================================
+
+// Configurações Evolution (variáveis de ambiente)
+const EVOLUTION_INSTANCE = process.env.EVOLUTION_INSTANCE || 'barbershop';
+const EVOLUTION_TOKEN = process.env.EVOLUTION_TOKEN || 'your-evolution-token';
+
+// =============================================
+// FUNÇÕES EVOLUTION API
+// =============================================
+
+// Função para enviar mensagem WhatsApp
+async function sendWhatsAppMessage(phoneNumber, message) {
+  try {
+    console.log('📱 Enviando WhatsApp para:', phoneNumber);
+    
+    // Limpar número (remover +, espaços, etc)
+    const cleanPhone = phoneNumber.replace(/\D/g, '');
+    const formattedPhone = cleanPhone.startsWith('55') ? cleanPhone : '55' + cleanPhone;
+    
+    const whatsappPayload = {
+      number: formattedPhone,
+      text: message
+    };
+    
+    console.log('📤 Payload WhatsApp:', whatsappPayload);
+    
+    // Se não tiver Evolution configurado, apenas loga
+    if (!EVOLUTION_INSTANCE || EVOLUTION_INSTANCE === 'your-evolution-token') {
+      console.log('⚠️ Evolution não configurado - simulando envio');
+      console.log('📱 Mensagem que seria enviada:', message);
+      return { success: true, simulated: true };
+    }
+    
+    // Envio real via Evolution API (local)
+    const response = await fetch(`http://localhost:8080/message/sendText/${EVOLUTION_INSTANCE}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'apikey': EVOLUTION_TOKEN
+      },
+      body: JSON.stringify(whatsappPayload)
+    });
+    
+    const result = await response.json();
+    console.log('✅ WhatsApp enviado:', result);
+    
+    return { success: response.ok, data: result };
+    
+  } catch (error) {
+    console.error('💥 Erro no WhatsApp:', error.message);
+    return { success: false, error: error.message };
+  }
+}
+
+// =============================================
+// ENDPOINT PARA BOAS-VINDAS WHATSAPP
+// =============================================
+
+// Endpoint que o N8N vai chamar
+app.post('/api/send-welcome-whatsapp', async (req, res) => {
+  try {
+    console.log('🎉 Enviando boas-vindas WhatsApp...');
+    console.log('📋 Dados recebidos:', req.body);
+    
+    const { telefone, nome_responsavel, empresa } = req.body;
+    
+    if (!telefone || !nome_responsavel || !empresa) {
+      return res.status(400).json({
+        status: 'error',
+        message: 'Telefone, nome e empresa são obrigatórios'
+      });
+    }
+    
+    // Mensagem de boas-vindas
+    const mensagem = `🎉 Olá ${nome_responsavel}!
+
+Bem-vindo ao sistema da ${empresa}!
+
+Seu cadastro foi realizado com sucesso! 
+
+🚀 Agora você pode:
+• Gerenciar agendamentos
+• Acompanhar relatórios
+• Receber notificações automáticas
+• Controlar sua barbearia
+
+Qualquer dúvida, estamos aqui! 💪
+
+Atenciosamente,
+Equipe Sistema Barbearia`;
+
+    // Enviar WhatsApp
+    const whatsappResult = await sendWhatsAppMessage(telefone, mensagem);
+    
+    // Resposta
+    res.json({
+      status: 'success',
+      message: 'Boas-vindas enviadas',
+      whatsapp: whatsappResult,
+      dados: {
+        telefone,
+        nome_responsavel,
+        empresa,
+        mensagem_enviada: mensagem
+      }
+    });
+    
+  } catch (error) {
+    console.error('💥 Erro nas boas-vindas:', error);
+    res.status(500).json({
+      status: 'error',
+      message: 'Erro ao enviar boas-vindas',
+      details: error.message
+    });
+  }
+});
+
+// =============================================
+// MODIFICAR O ENDPOINT SIGNUP EXISTENTE
+// =============================================
+
+// No final do endpoint /api/signup-establishment (após sucesso):
+
+    // 8. Sucesso total! + Notificação N8N
+    console.log('✅ Usuário e estabelecimento criados com sucesso!');
+
+    // Preparar dados para N8N (boas-vindas)
+    const welcomeData = {
+      user_id: userId,
+      establishment_id: establishmentResult[0]?.id,
+      nome_responsavel: name.trim(),
+      empresa: empresa.trim(),
+      telefone: cleanPhone,
+      email: emailToTest,
+      created_at: new Date().toISOString()
+    };
+
+    // Enviar para N8N (boas-vindas) - não bloqueia se der erro
+    try {
+      if (N8N_WEBHOOK_URL) {
+        console.log('📡 Enviando para N8N (boas-vindas)...');
+        
+        const n8nResponse = await fetch(N8N_WEBHOOK_URL.replace('sales-webhook', 'cadastro-boas-vindas'), {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            event_type: 'welcome_signup',
+            ...welcomeData
+          })
+        });
+
+        if (n8nResponse.ok) {
+          console.log('✅ Boas-vindas enviadas para N8N!');
+        } else {
+          console.error('❌ Erro ao enviar para N8N:', await n8nResponse.text());
+        }
+      }
+    } catch (error) {
+      console.error('💥 Erro N8N boas-vindas (não crítico):', error.message);
+    }
+
+// =============================================
+// ENDPOINTS EVOLUTION API MANAGEMENT
+// =============================================
+
+// Status da instância WhatsApp
+app.get('/api/whatsapp/status', (req, res) => {
+  res.json({
+    status: 'ok',
+    evolution_configured: !!EVOLUTION_INSTANCE && EVOLUTION_INSTANCE !== 'your-evolution-token',
+    instance: EVOLUTION_INSTANCE,
+    message: EVOLUTION_INSTANCE === 'your-evolution-token' ? 
+      'Evolution não configurado - mensagens simuladas' : 
+      'Evolution configurado'
+  });
+});
+
+// Teste de envio WhatsApp
+app.post('/api/whatsapp/test', async (req, res) => {
+  try {
+    const { telefone, mensagem } = req.body;
+    
+    if (!telefone || !mensagem) {
+      return res.status(400).json({
+        status: 'error',
+        message: 'Telefone e mensagem são obrigatórios'
+      });
+    }
+    
+    const result = await sendWhatsAppMessage(telefone, mensagem);
+    
+    res.json({
+      status: 'success',
+      result: result
+    });
+    
+  } catch (error) {
+    res.status(500).json({
+      status: 'error',
+      message: error.message
+    });
+  }
+});
+
+console.log('📱 Evolution API integrada!');
+console.log(`📍 WhatsApp Status: http://localhost:${PORT}/api/whatsapp/status`);
+console.log(`📍 WhatsApp Test: http://localhost:${PORT}/api/whatsapp/test`);
+console.log(`📍 Welcome WhatsApp: http://localhost:${PORT}/api/send-welcome-whatsapp`);
+
 console.log('🚀 API Supabase FORÇADA iniciada!');
