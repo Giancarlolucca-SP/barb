@@ -432,3 +432,4 @@ console.log(`📍 WhatsApp Test: http://localhost:${PORT}/api/whatsapp/test`);
 console.log(`📍 Welcome WhatsApp: http://localhost:${PORT}/api/send-welcome-whatsapp`);
 
 console.log('🚀 API Supabase FORÇADA iniciada!');
+console.log('🔥 CODIGO NOVO FUNCIONANDO - VERSION 2.0!');
