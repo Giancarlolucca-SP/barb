@@ -545,6 +545,15 @@ app.post('/api/servicos', async (req, res) => {
   }
 });
 
+// Logo após os middlewares, ANTES de app.use('/', router)
+app.get('/healthz', (_req, res) => {
+  console.log('Healthcheck chamado');
+  res.status(200).send('ok');
+});
+
+// Depois as outras rotas
+app.use('/', router);
+
 // Adicionar esta linha
 router.use('/api', servicosRouter); 
 
