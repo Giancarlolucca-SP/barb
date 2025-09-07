@@ -425,6 +425,112 @@ app.post('/api/whatsapp/test', async (req, res) => {
     });
   }
 });
+app.post('/api/servicos', async (req, res) => {
+  try {
+    const { nome_servicos, duracao, comissao, ativo, preco_servico } = req.body;
+    
+    // Validações
+    if (!nome_servicos) {
+      return res.status(400).json({ error: 'Nome do serviço é obrigatório' });
+    }
+    
+    // Inserir no Supabase
+    const { data, error } = await supabase
+      .from('servicos')
+      .insert({
+        nome_servicos,
+        duracao: parseInt(duracao),
+        comissao: parseFloat(comissao),
+        ativo: ativo === 'yes' || ativo === true,
+        preco_servico: parseFloat(preco_servico)
+      })
+      .select();
+    
+    if (error) {
+      return res.status(500).json({ error: 'Erro ao salvar serviço' });
+    }
+    
+    res.json({ success: true, data: data[0] });
+    
+  } catch (error) {
+    res.status(500).json({ error: 'Erro interno do servidor' });
+  }
+});
+import { Router } from 'express';
+import { PrismaClient } from '@prisma/client';
+
+const router = Router();
+const prisma = new PrismaClient();
+
+// POST /api/servicos
+router.post('/servicos', async (req, res) => {
+  try {
+    const { nome_servicos, duracao, comissao, ativo, preco_servico } = req.body;
+    
+    // Validações
+    if (!nome_servicos) {
+      return res.status(400).json({ 
+        error: 'Nome do serviço é obrigatório',
+        status: 400
+      });
+    }
+
+    // Inserir no banco
+    const novoServico = await prisma.servicos.create({
+      data: {
+        nome_servicos: nome_servicos.trim(),
+        duracao: parseInt(duracao) || 0,
+        comissao: parseFloat(comissao) || 0,
+        ativo: ativo === 'yes' || ativo === true || ativo === 'true',
+        preco_servico: parseFloat(preco_servico) || 0,
+      }
+    });
+
+    res.status(201).json({ 
+      success: true, 
+      data: novoServico,
+      message: 'Serviço criado com sucesso'
+    });
+
+  } catch (error) {
+    console.error('Erro ao criar serviço:', error);
+    res.status(500).json({ 
+      error: 'Erro interno do servidor',
+      status: 500,
+      message: error.message
+    });
+  }
+});
+
+// GET /api/servicos - listar serviços
+router.get('/servicos', async (req, res) => {
+  try {
+    const servicos = await prisma.servicos.findMany({
+      where: { ativo: true },
+      orderBy: { created_at: 'desc' }
+    });
+
+    res.json({ 
+      success: true, 
+      data: servicos 
+    });
+
+  } catch (error) {
+    res.status(500).json({ 
+      error: 'Erro ao buscar serviços',
+      status: 500 
+    });
+  }
+});
+
+export default router;
+
+import servicosRouter from './servicos.router.js';
+
+// ... suas outras rotas
+
+// Adicionar esta linha
+router.use('/api', servicosRouter); 
 
 console.log('📱 Evolution API integrada!');
 console.log(`📍 WhatsApp Status: http://localhost:${PORT}/api/whatsapp/status`);
