@@ -527,7 +527,23 @@ export default router;
 
 import servicosRouter from './servicos.router.js';
 
-// ... suas outras rotas
+// ... suas outras rotas.
+// No seu arquivo de rotas (ex: routes/servicos.js)
+app.post('/api/servicos', async (req, res) => {
+  try {
+    console.log('Body recebido:', req.body);
+    
+    const { nome_servicos, duracao, comissao, ativo, preco_servico } = req.body;
+    
+    // Seu código de inserção aqui
+    
+    res.json({ success: true, message: 'Serviço criado' });
+    
+  } catch (error) {
+    console.error('Erro:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
 
 // Adicionar esta linha
 router.use('/api', servicosRouter); 
